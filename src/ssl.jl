@@ -9,10 +9,14 @@ on_bio_stream_create(bio::BIO) = Cint(1)
 on_bio_stream_destroy(bio::BIO)::Cint = Cint(0)
 
 function bio_get_data(bio::BIO)
+    return bio_get_data(bio.bio)
+end
+
+function bio_get_data(bio::Ptr{Cvoid})
     data = ccall(
         (:BIO_get_data, libcrypto),
         Ptr{Cvoid},
-        (BIO,),
+        (Ptr{Cvoid},),
         bio)
     return unsafe_pointer_to_objref(data)
 end
@@ -23,16 +27,24 @@ const BIO_FLAGS_WRITE = 0x02
 const BIO_FLAGS_IO_SPECIAL = 0x04
 
 function bio_set_flags(bio::BIO, flags)
+    return bio_set_flags(bio.bio, flags)
+end
+
+function bio_set_flags(bio::Ptr{Cvoid}, flags)
     return ccall(
         (:BIO_set_flags, libcrypto),
         Cint,
-        (BIO, Cint),
+        (Ptr{Cvoid}, Cint),
         bio, flags)
 end
-bio_set_read_retry(bio::BIO) = bio_set_flags(bio, BIO_FLAGS_READ | BIO_FLAGS_SHOULD_RETRY)
-bio_clear_flags(bio::BIO) = bio_set_flags(bio, 0x00)
 
-function on_bio_stream_read(bio::BIO, out::Ptr{Cchar}, outlen::Cint)
+bio_set_read_retry(bio::BIO) = bio_set_read_retry(bio.bio)
+bio_set_read_retry(bio::Ptr{Cvoid}) = bio_set_flags(bio, BIO_FLAGS_READ | BIO_FLAGS_SHOULD_RETRY)
+
+bio_clear_flags(bio::BIO) = bio_clear_flags(bio.bio)
+bio_clear_flags(bio::Ptr{Cvoid}) = bio_set_flags(bio, 0x00)
+
+function on_bio_stream_read(bio::Ptr{Cvoid}, out::Ptr{Cchar}, outlen::Cint)
     try
         bio_clear_flags(bio)
         io = bio_get_data(bio)::TCPSocket
@@ -49,7 +61,7 @@ function on_bio_stream_read(bio::BIO, out::Ptr{Cchar}, outlen::Cint)
     end
 end
 
-function on_bio_stream_write(bio::BIO, in::Ptr{Cchar}, inlen::Cint)::Cint
+function on_bio_stream_write(bio::Ptr{Cvoid}, in::Ptr{Cchar}, inlen::Cint)::Cint
     try
         io = bio_get_data(bio)::TCPSocket
         written = unsafe_write(io, in, inlen)
@@ -61,7 +73,6 @@ function on_bio_stream_write(bio::BIO, in::Ptr{Cchar}, inlen::Cint)::Cint
 end
 
 on_bio_stream_puts(bio::BIO, in::Ptr{Cchar})::Cint = Cint(0)
-
 on_bio_stream_ctrl(bio::BIO, cmd::BIOCtrl, num::Clong, ptr::Ptr{Cvoid}) = Clong(1)
 
 """
@@ -78,8 +89,8 @@ struct BIOStreamCallbacks
     function BIOStreamCallbacks()
         on_bio_create_ptr = @cfunction on_bio_stream_create Cint (BIO,)
         on_bio_destroy_ptr = @cfunction on_bio_stream_destroy Cint (BIO,)
-        on_bio_read_ptr = @cfunction on_bio_stream_read Cint (BIO, Ptr{Cchar}, Cint)
-        on_bio_write_ptr = @cfunction on_bio_stream_write Cint (BIO, Ptr{Cchar}, Cint)
+        on_bio_read_ptr = @cfunction on_bio_stream_read Cint (Ptr{Cvoid}, Ptr{Cchar}, Cint)
+        on_bio_write_ptr = @cfunction on_bio_stream_write Cint (Ptr{Cvoid}, Ptr{Cchar}, Cint)
         on_bio_puts_ptr = @cfunction on_bio_stream_puts Cint (BIO, Ptr{Cchar})
         on_bio_ctrl_ptr = @cfunction on_bio_stream_ctrl Clong (BIO, BIOCtrl, Clong, Ptr{Cvoid})
 

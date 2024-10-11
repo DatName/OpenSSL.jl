@@ -1,5 +1,7 @@
 module OpenSSL
 
+__precompile__(false)
+
 using BitFlags
 using Dates
 using OpenSSL_jll
